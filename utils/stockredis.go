@@ -13,16 +13,9 @@ import (
 
 var verbose bool = false
 
-func WriteOHLC (stock string, open string, high string, low string, sclose string, volume string, date string) {
+func WriteOHLC (conn redis.Conn, stock string, open string, high string, low string, sclose string, volume string, date string) {
 
-    conn, err := redis.Dial("tcp", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    defer conn.Close()
-
-    _, err = conn.Do("HMSET", stock+":open", date, open)
+    _, err := conn.Do("HMSET", stock+":open", date, open)
     if err != nil {
         log.Fatal(err)
     }
@@ -51,6 +44,13 @@ func PushAllStockData (data_dir string) {
         log.Fatal(err)
     }
 
+    conn, err := redis.Dial("tcp", "localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    defer conn.Close()
+
     for _, f := range files {
         fmt.Println(f.Name())
         readFile, err := os.Open(data_dir+"/"+f.Name())
@@ -70,7 +70,7 @@ func PushAllStockData (data_dir string) {
             date := d[0:4]+"-"+d[4:6]+"-"+d[6:8]
 
             // Write OHLC data 
-            WriteOHLC(s[0], s[2], s[3], s[4], s[5], s[6], date)
+            WriteOHLC(conn, s[0], s[2], s[3], s[4], s[5], s[6], date)
         }
     }
 }

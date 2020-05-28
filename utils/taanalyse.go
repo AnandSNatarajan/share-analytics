@@ -16,7 +16,7 @@ const (
 var anotes map[string]string
 var adata map[string]int
 
-func heikenAshiPrepareCandles (ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, color []int, ctype []string) () {
+func heikenAshiPrepareCandles(ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, color []int, ctype []string) () {
 
      for key, _ := range ha_close {
 
@@ -62,7 +62,7 @@ func heikenAshiPrepareCandles (ha_open []float64, ha_high []float64, ha_low []fl
      return 
 }
 
-func heikenAshiAnalysis (conn redis.Conn, stock string, sclose []float64, ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, dates []string) {
+func heikenAshiAnalysis(conn redis.Conn, stock string, sclose []float64, ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, dates []string) {
 
     var trend_changes = 0
     var last_trend_change = 0
@@ -207,13 +207,40 @@ func priceActionAnalysis (conn redis.Conn, stock string, sopen []float64, shigh 
     conn.Do("HSET", stock, "52-Week-High", high, "52-Week-Low", low)
 }
 
-func StockCommentary (conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
+func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, lows []float64) ([]float64, []float64, []float64, []float64) {
+	N := len(highs)
+
+	heikinHighs := make([]float64, N)
+	heikinOpens := make([]float64, N)
+	heikinCloses := make([]float64, N)
+	heikinLows := make([]float64, N)
+
+	for currentCandle := 1; currentCandle < N; currentCandle++ {
+		previousCandle := currentCandle - 1
+
+        heikinCloses[currentCandle] = (highs[currentCandle] + opens[currentCandle] + closes[currentCandle] + lows[currentCandle]) / 4
+        heikinOpens[currentCandle] = (heikinOpens[previousCandle] + heikinCloses[previousCandle]) / 2
+        heikinHighs[currentCandle] = math.Max(highs[currentCandle], math.Max(heikinOpens[currentCandle], heikinCloses[currentCandle]))
+        heikinLows[currentCandle] = math.Min(lows[currentCandle], math.Min(heikinOpens[currentCandle], heikinCloses[currentCandle]))
+
+        /* Buggy implementation in original is below
+		heikinHighs[currentCandle] = math.Max(highs[currentCandle], math.Max(opens[currentCandle], closes[currentCandle]))
+		heikinOpens[currentCandle] = (opens[previousCandle] + closes[previousCandle]) / 2
+		heikinCloses[currentCandle] = (highs[currentCandle] + opens[currentCandle] + closes[currentCandle] + lows[currentCandle]) / 4
+        heikinLows[currentCandle] = math.Min(highs[currentCandle], math.Min(opens[currentCandle], closes[currentCandle]))
+        */
+	}
+
+	return heikinHighs, heikinOpens, heikinCloses, heikinLows
+}
+
+func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
 
     anotes = make(map[string]string, 40)
     adata = make(map[string]int, 40)
 
-    ha_high, ha_open, ha_close, ha_low := talib.HeikinashiCandles(shigh, sopen, sclose, slow)
-
+    ha_high, ha_open, ha_close, ha_low := MyHeikinashiCandles(shigh, sopen, sclose, slow)
+ 
     var ema5, ema13, ema50, ema200, rsi14 []float64
     /* Compute EMA */
     if (len(sclose) > 5) {

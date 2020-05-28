@@ -7,11 +7,7 @@ import (
     "github.com/gomodule/redigo/redis"
 )
 
-func PullAllStockData(stock string, dates []string) ([]float64,
-                                                     []float64,
-                                                     []float64,
-                                                     []float64,
-                                                     []int64) {
+func PullAllStockData(stock string, dates []string) ([]float64, []float64, []float64, []float64, []int64) {
 
     var sopen, shigh, slow, sclose []float64
     var volume []int64
