@@ -13,9 +13,6 @@ const (
 	RED   = 2
 )
 
-var anotes map[string]string
-var adata map[string]int
-
 func heikenAshiPrepareCandles(ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, color []int, ctype []string) {
 
 	for key, _ := range ha_close {
@@ -145,84 +142,95 @@ func heikenAshiAnalysis(conn redis.Conn, stock string, sclose []float64, ha_open
 	redis.String(conn.Do("HSET", stock, "HA-Pattern", pattern))
 }
 
-func emaAnalysis(conn redis.Conn, stock string, ema1 []float64, ema2 []float64, period1 int, period2 int, dates []string) {
-	var last_bullish = 0
-	var last_bearish = 0
-
-	if len(ema1) == 0 || len(ema2) == 0 {
-		return
+func cdrString(ema3 []float64, ema8 []float64, index int) string {
+	if ema3[index-1] > ema8[index-1] && ema3[index] < ema8[index] {
+		return "RD"
 	}
 
-	for i := 0; i <= len(ema1)-2; i++ {
-		if ema1[i] < ema2[i] && ema1[i+1] > ema2[i+1] {
-			last_bullish = i
+	if ema3[index-1] < ema8[index-1] && ema3[index] > ema8[index] {
+		return "RU"
+	}
+
+	if ema3[index] > ema8[index] {
+		if (ema3[index-1] - ema8[index-1]) > (ema3[index] - ema8[index]) {
+			return "C"
+		} else {
+			return "D"
 		}
-		if ema1[i] > ema2[i] && ema1[i+1] < ema2[i+1] {
-			last_bearish = i
-		}
 	}
 
-	if last_bearish > last_bullish {
-		temp := fmt.Sprintf("EMA%d-EMA%d-Status", period1, period2)
-		conn.Do("HSET", stock, temp, "Bearish")
-		temp = fmt.Sprintf("EMA%d-EMA%d-Days", period1, period2)
-		conn.Do("HSET", stock, temp, len(ema1)-last_bearish)
-	} else {
-		temp := fmt.Sprintf("EMA%d-EMA%d-Status", period1, period2)
-		redis.String(conn.Do("HSET", stock, temp, "Bullish"))
-		temp = fmt.Sprintf("EMA%d-EMA%d-Days", period1, period2)
-		redis.String(conn.Do("HSET", stock, temp, len(ema1)-last_bullish))
+	if ema8[index] > ema3[index] {
+		if (ema8[index-1] - ema3[index-1]) > (ema8[index] - ema3[index]) {
+			return "C"
+		} else {
+			return "D"
+		}
 	}
+	return "U"
 }
 
-func priceActionAnalysis(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64) {
+func emaAnalysis(ema1 []float64, ema2 []float64) (string, int) {
 
-	var min, max float64
+	days := len(ema1) - 1
 
-	min = sclose[len(sclose)-2]
-	max = sclose[len(sclose)-2]
-	for i := len(sclose) - 2; i > len(sclose)-10; i-- {
-		if min > slow[i] {
-			min = slow[i]
+	var pattern = ""
+	var chg int
+
+	for i := 7; i >= 1; i-- {
+		cc := cdrString(ema1, ema2, days-i)
+		pattern += (cc + "-")
+	}
+	pattern += cdrString(ema1, ema2, days)
+
+	if ema1[days] > ema2[days] {
+		chg = 1
+		for i := 1; i < days-1; i++ {
+			if ema1[days-i] < ema2[days-i] {
+				break
+			}
+			chg++
 		}
-		if max < shigh[i] {
-			max = shigh[i]
+	} else {
+		chg = 1
+		for i := 1; i < days-1; i++ {
+			if ema1[days-i] > ema2[days-i] {
+				break
+			}
+			chg++
 		}
 	}
 
-	crange := max - min
-	pct := math.Round((sclose[len(sclose)-1] - min) / crange * 100)
-	conn.Do("HSET", stock, "10D-Trend", pct)
+	return pattern, chg
+}
 
-	i := len(sclose) - 1
-	chg := ((sclose[i] - sclose[i-1]) / sclose[i-1]) * 100
-	d_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-5]) / sclose[i-5]) * 100
-	w_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-10]) / sclose[i-10]) * 100
-	w2_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-20]) / sclose[i-20]) * 100
-	m_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-60]) / sclose[i-60]) * 100
-	m3_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-125]) / sclose[i-125]) * 100
-	m6_str := fmt.Sprintf("%.02f", chg)
-	chg = ((sclose[i] - sclose[i-250]) / sclose[i-250]) * 100
-	y_str := fmt.Sprintf("%.02f", chg)
-	conn.Do("HSET", stock, "1-D", d_str, "1-W", w_str, "2-W", w2_str, "1-M", m_str, "3-M", m3_str, "6-M", m6_str, "1-Y", y_str)
+func ema3Status(ema3 []float64, ema8 []float64, ema13 []float64, ema20 []float64, ema50 []float64, today int) string {
+	pattern := ""
 
-	w52 := sclose[:53]
-	high := w52[0]
-	low := w52[0]
-	for _, value := range w52 {
-		if value > high {
-			high = value
-		}
-		if value < low {
-			high = value
-		}
+	if ema3[today] > ema8[today] {
+		pattern += "A-"
+	} else {
+		pattern += "B-"
 	}
-	conn.Do("HSET", stock, "52-Week-High", high, "52-Week-Low", low)
+
+	if ema3[today] > ema13[today] {
+		pattern += "A-"
+	} else {
+		pattern += "B-"
+	}
+
+	if ema3[today] > ema20[today] {
+		pattern += "A-"
+	} else {
+		pattern += "B-"
+	}
+
+	if ema3[today] > ema50[today] {
+		pattern += "A"
+	} else {
+		pattern += "B"
+	}
+
+	return pattern
 }
 
 func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, lows []float64) ([]float64, []float64, []float64, []float64) {
@@ -252,35 +260,100 @@ func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, low
 	return heikinHighs, heikinOpens, heikinCloses, heikinLows
 }
 
-func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
+func sarPattern(shigh []float64, slow []float64, sclose []float64) string {
+	pattern := ""
 
-	anotes = make(map[string]string, 40)
-	adata = make(map[string]int, 40)
+	sar := talib.Sar(shigh, slow, 0.02, 0.2)
+	if sar[len(shigh)-4] > sclose[len(shigh)-4] {
+		pattern += "D-"
+	} else {
+		pattern += "U-"
+	}
+
+	if sar[len(shigh)-3] > sclose[len(shigh)-3] {
+		pattern += "D-"
+	} else {
+		pattern += "U-"
+	}
+	if sar[len(shigh)-2] > sclose[len(shigh)-2] {
+		pattern += "D-"
+	} else {
+		pattern += "U-"
+	}
+	if sar[len(shigh)-1] > sclose[len(shigh)-1] {
+		pattern += "D"
+	} else {
+		pattern += "U"
+	}
+
+	return pattern
+}
+
+func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
 
 	ha_high, ha_open, ha_close, ha_low := MyHeikinashiCandles(shigh, sopen, sclose, slow)
 
-	var ema5, ema13, ema50, ema200, rsi14 []float64
-	/* Compute EMA */
-	if len(sclose) > 5 {
-		ema5 = talib.Ema(sclose, 5)
+	var ema50, ema20, ema13, ema8, ema3 []float64
+	if len(ha_close)-1 > 3 {
+		ema3 = talib.Ema(ha_close, 3)
 	}
-	if len(sclose) > 5 {
-		ema13 = talib.Ema(sclose, 13)
+	if len(ha_close)-1 > 20 {
+		ema20 = talib.Ema(ha_close, 20)
 	}
-	if len(sclose) > 5 {
-		ema50 = talib.Ema(sclose, 50)
+	if len(ha_close)-1 > 13 {
+		ema13 = talib.Ema(ha_close, 13)
 	}
-	if len(sclose) > 5 {
-		ema200 = talib.Ema(sclose, 200)
+	if len(ha_close)-1 > 8 {
+		ema8 = talib.Ema(ha_close, 8)
 	}
-	if len(sclose) > 15 {
-		rsi14 = talib.Rsi(sclose, 14)
-		rsi_str := fmt.Sprintf("%.02f", rsi14[len(rsi14)-1])
-		redis.String(conn.Do("HSET", stock+":"+"Analysis", "RSI", rsi_str))
+	if len(ha_close)-1 > 50 {
+		ema50 = talib.Ema(ha_close, 50)
 	}
 
-	emaAnalysis(conn, stock+":"+"Analysis", ema5, ema13, 5, 13, dates)
-	emaAnalysis(conn, stock+":"+"Analysis", ema50, ema200, 50, 200, dates)
+	color := GREEN
+	if len(ha_close)-1 > 8 {
+		if ha_close[len(ha_close)-1] > ha_open[len(ha_close)-1] {
+			color = GREEN
+		} else {
+			color = RED
+		}
+
+		rsi8 := talib.Rsi(ha_close, 8)
+		today := len(rsi8) - 1
+		if (rsi8[today] > rsi8[today-1]) && (color != GREEN) {
+			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Abnormal")
+		} else if (rsi8[today] < rsi8[today-1]) && (color != RED) {
+			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Abnormal")
+		} else {
+			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Normal")
+		}
+	}
+
+	if len(ha_close) > 8 {
+		pattern, _ := emaAnalysis(ema3, ema8)
+		conn.Do("HSET", stock+":"+"Analysis", "ST-Pattern", pattern)
+	}
+
+	if ema3[len(ema3)-1] > ema50[len(ema3)-1] {
+		conn.Do("HSET", stock+":"+"Analysis", "LT-Trend", "Uptrend")
+	} else {
+		conn.Do("HSET", stock+":"+"Analysis", "LT-Trend", "Downtrend")
+	}
+
+	positive := 0
+	for i := 1; i <= 13; i++ {
+		if ha_close[len(ha_close)-1] > ha_close[len(ha_close)-i-1] {
+			positive++
+		}
+	}
+
+	conn.Do("HSET", stock+":"+"Analysis", "Sar", sarPattern(shigh, slow, sclose))
+	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-1))
+	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-1", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-2))
+	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-2", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-3))
+	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-3", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-4))
+	conn.Do("HSET", stock+":"+"Analysis", "NewHigh", positive)
+
 	heikenAshiAnalysis(conn, stock+":"+"Analysis", sclose, ha_open, ha_high, ha_low, ha_close, dates)
-	priceActionAnalysis(conn, stock+":"+"Analysis", sopen, shigh, slow, sclose)
+	//priceActionAnalysis(conn, stock+":"+"Analysis", sopen, shigh, slow, sclose)
 }

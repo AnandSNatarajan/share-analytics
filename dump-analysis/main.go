@@ -57,7 +57,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,HA-Chg-10D,HA-PriceChg,EMA5-EMA13-S,EMA5-EMA13-D,EMA50-EMA200-S,EMA50-EMA200-D,RSI,10D-Trend,Holding,52-Week-High,52-Week-Low,1-D,1-W,2-W,1-M,3-M,6-M,1-Y\n")
+	_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,ST-Pattern,Trend,E-3,E-2,E-1,E,Sar,NewHigh,RSI-Pattern,Holding\n")
 	if err != nil {
 		log.Fatal(err)
 		f.Close()
@@ -85,28 +85,21 @@ func main() {
 		analysis += values["HAC-2D"] + ","
 		analysis += values["HAC-3D"] + ","
 		analysis += values["HA-Trend-Days"] + ","
-		analysis += values["HA-Chg-10D"] + ","
-		analysis += values["HA-PriceChg"] + ","
-		analysis += values["EMA5-EMA13-Status"] + ","
-		analysis += values["EMA5-EMA13-Days"] + ","
-		analysis += values["EMA50-EMA200-Status"] + ","
-		analysis += values["EMA50-EMA200-Days"] + ","
-		analysis += values["RSI"] + ","
-		analysis += values["10D-Trend"] + ","
+		analysis += values["ST-Pattern"] + ","
+		analysis += values["LT-Trend"] + ","
+		analysis += values["Ema3Status-3"] + ","
+		analysis += values["Ema3Status-2"] + ","
+		analysis += values["Ema3Status-1"] + ","
+		analysis += values["Ema3Status"] + ","
+		analysis += values["Sar"] + ","
+		analysis += values["NewHigh"] + ","
+		analysis += values["RSI-Pattern"] + ","
 		if contains(holdings, stock) {
 			analysis += "Y,"
 		} else {
 			analysis += "N,"
 		}
-		analysis += values["52-Week-High"] + ","
-		analysis += values["52-Week-Low"] + ","
-		analysis += values["1-D"] + ","
-		analysis += values["1-W"] + ","
-		analysis += values["2-W"] + ","
-		analysis += values["1-M"] + ","
-		analysis += values["3-M"] + ","
-		analysis += values["6-M"] + ","
-		analysis += values["1-Y"] + "\n"
+		analysis += "\n"
 		fmt.Println(analysis)
 		f.WriteString(analysis)
 	}
