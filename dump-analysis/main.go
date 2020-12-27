@@ -6,6 +6,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"log"
 	"os"
+	"strings"
 )
 
 // Contains tells whether a contains x.
@@ -37,8 +38,6 @@ func main() {
 		holdings = append(holdings, stock)
 	}
 
-	fmt.Println(holdings)
-
 	// Retreive all stocks for processing
 	readFile, err := os.Open(os.Args[1])
 	if err != nil {
@@ -52,7 +51,9 @@ func main() {
 
 	defer conn.Close()
 
-	f, err := os.Create("stock-analysis.csv")
+	s := strings.Split(os.Args[1], "/")
+	l := len(s)
+	f, err := os.Create(s[l-1] + ".csv")
 	if err != nil {
 		log.Fatal(err)
 		return
