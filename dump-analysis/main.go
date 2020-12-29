@@ -58,7 +58,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,ST-Pattern,Trend,E-3,E-2,E-1,E,Sar,NewHigh,RSI-Pattern,Holding\n")
+	_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,ST-Pattern,Zone-Status,Zone-Length,Zone-Sequence,NewHigh,RSI-Pattern,Holding\n")
 	if err != nil {
 		log.Fatal(err)
 		f.Close()
@@ -87,12 +87,9 @@ func main() {
 		analysis += values["HAC-3D"] + ","
 		analysis += values["HA-Trend-Days"] + ","
 		analysis += values["ST-Pattern"] + ","
-		analysis += values["LT-Trend"] + ","
-		analysis += values["Ema3Status-3"] + ","
-		analysis += values["Ema3Status-2"] + ","
-		analysis += values["Ema3Status-1"] + ","
-		analysis += values["Ema3Status"] + ","
-		analysis += values["Sar"] + ","
+		analysis += values["Zone-Status"] + ","
+		analysis += values["Zone-Length"] + ","
+		analysis += values["Zone-Sequence"] + ","
 		analysis += values["NewHigh"] + ","
 		analysis += values["RSI-Pattern"] + ","
 		if contains(holdings, stock) {

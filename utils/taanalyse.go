@@ -203,36 +203,6 @@ func emaAnalysis(ema1 []float64, ema2 []float64) (string, int) {
 	return pattern, chg
 }
 
-func ema3Status(ema3 []float64, ema8 []float64, ema13 []float64, ema20 []float64, ema50 []float64, today int) string {
-	pattern := ""
-
-	if ema3[today] > ema8[today] {
-		pattern += "A-"
-	} else {
-		pattern += "B-"
-	}
-
-	if ema3[today] > ema13[today] {
-		pattern += "A-"
-	} else {
-		pattern += "B-"
-	}
-
-	if ema3[today] > ema20[today] {
-		pattern += "A-"
-	} else {
-		pattern += "B-"
-	}
-
-	if ema3[today] > ema50[today] {
-		pattern += "A"
-	} else {
-		pattern += "B"
-	}
-
-	return pattern
-}
-
 func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, lows []float64) ([]float64, []float64, []float64, []float64) {
 	N := len(highs)
 
@@ -260,54 +230,90 @@ func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, low
 	return heikinHighs, heikinOpens, heikinCloses, heikinLows
 }
 
-func sarPattern(shigh []float64, slow []float64, sclose []float64) string {
-	pattern := ""
+func sarPattern(shigh []float64, slow []float64, sclose []float64) []string {
+	pattern := make([]string, len(shigh))
 
 	sar := talib.Sar(shigh, slow, 0.02, 0.2)
-	if sar[len(shigh)-4] > sclose[len(shigh)-4] {
-		pattern += "D-"
-	} else {
-		pattern += "U-"
-	}
-
-	if sar[len(shigh)-3] > sclose[len(shigh)-3] {
-		pattern += "D-"
-	} else {
-		pattern += "U-"
-	}
-	if sar[len(shigh)-2] > sclose[len(shigh)-2] {
-		pattern += "D-"
-	} else {
-		pattern += "U-"
-	}
-	if sar[len(shigh)-1] > sclose[len(shigh)-1] {
-		pattern += "D"
-	} else {
-		pattern += "U"
+	for i := 0; i <= len(shigh)-1; i++ {
+		if sar[i] > sclose[i] {
+			pattern[i] = "D"
+		} else {
+			pattern[i] = "U"
+		}
 	}
 
 	return pattern
+}
+
+func zoneAnalysis(ha_close []float64, shigh []float64, slow []float64, sclose []float64, sar_pattern []string) (string, string, int) {
+
+	var last_zone, penultimate_zone, zone_status, zone_sequence string
+
+	st_macd, _, _ := talib.Macd(ha_close, 3, 13, 8)
+	lt_macd, _, _ := talib.Macd(ha_close, 13, 50, 8)
+
+	today := len(st_macd) - 1
+	zone_length := 0
+	zone_changed := false
+
+	for i := 0; i <= 51; i++ {
+		if st_macd[today-i] > 0 && lt_macd[today-i] > 0 && sar_pattern[today-i] == "U" {
+			zone_sequence += "B-"
+			if i == 0 {
+				last_zone = "B"
+				zone_length = 1
+			} else if i == 1 {
+				penultimate_zone = "B"
+			}
+			/* Still no crossover has happened */
+			if i != 0 && zone_changed == false {
+				if last_zone == "S" {
+					zone_changed = true
+				} else {
+					zone_length++
+				}
+			}
+		} else {
+			zone_sequence += "S-"
+			if i == 0 {
+				last_zone = "S"
+				zone_length = 1
+			} else if i == 1 {
+				penultimate_zone = "S"
+			}
+			if i != 0 && zone_changed == false {
+				if last_zone == "B" {
+					zone_changed = true
+				} else {
+					zone_length++
+				}
+			}
+		}
+	}
+
+	if last_zone == "B" && penultimate_zone == "S" {
+		zone_status = "Positive-Crossover"
+	} else if last_zone == "S" && penultimate_zone == "B" {
+		zone_status = "Negative-Crossover"
+	} else if last_zone == "B" {
+		zone_status = "Buy-Zone"
+	} else {
+		zone_status = "Sell-Zone"
+	}
+
+	return zone_sequence, zone_status, zone_length
 }
 
 func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
 
 	ha_high, ha_open, ha_close, ha_low := MyHeikinashiCandles(shigh, sopen, sclose, slow)
 
-	var ema50, ema20, ema13, ema8, ema3 []float64
+	var ema13, ema3 []float64
 	if len(ha_close)-1 > 3 {
 		ema3 = talib.Ema(ha_close, 3)
 	}
-	if len(ha_close)-1 > 20 {
-		ema20 = talib.Ema(ha_close, 20)
-	}
 	if len(ha_close)-1 > 13 {
 		ema13 = talib.Ema(ha_close, 13)
-	}
-	if len(ha_close)-1 > 8 {
-		ema8 = talib.Ema(ha_close, 8)
-	}
-	if len(ha_close)-1 > 50 {
-		ema50 = talib.Ema(ha_close, 50)
 	}
 
 	color := GREEN
@@ -330,15 +336,11 @@ func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []flo
 	}
 
 	if len(ha_close) > 8 {
-		pattern, _ := emaAnalysis(ema3, ema8)
+		pattern, _ := emaAnalysis(ema3, ema13)
 		conn.Do("HSET", stock+":"+"Analysis", "ST-Pattern", pattern)
 	}
-
-	if ema3[len(ema3)-1] > ema50[len(ema3)-1] {
-		conn.Do("HSET", stock+":"+"Analysis", "LT-Trend", "Uptrend")
-	} else {
-		conn.Do("HSET", stock+":"+"Analysis", "LT-Trend", "Downtrend")
-	}
+	sar_pattern := sarPattern(shigh, slow, sclose)
+	zone_sequence, zone_status, zone_length := zoneAnalysis(ha_close, shigh, slow, sclose, sar_pattern)
 
 	positive := 0
 	for i := 1; i <= 13; i++ {
@@ -347,11 +349,10 @@ func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []flo
 		}
 	}
 
-	conn.Do("HSET", stock+":"+"Analysis", "Sar", sarPattern(shigh, slow, sclose))
-	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-1))
-	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-1", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-2))
-	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-2", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-3))
-	conn.Do("HSET", stock+":"+"Analysis", "Ema3Status-3", ema3Status(ema3, ema8, ema13, ema20, ema50, len(ema3)-4))
+	conn.Do("HSET", stock+":"+"Analysis", "Sar", sar_pattern)
+	conn.Do("HSET", stock+":"+"Analysis", "Zone-Sequence", zone_sequence)
+	conn.Do("HSET", stock+":"+"Analysis", "Zone-Status", zone_status)
+	conn.Do("HSET", stock+":"+"Analysis", "Zone-Length", zone_length)
 	conn.Do("HSET", stock+":"+"Analysis", "NewHigh", positive)
 
 	heikenAshiAnalysis(conn, stock+":"+"Analysis", sclose, ha_open, ha_high, ha_low, ha_close, dates)
