@@ -58,7 +58,8 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,ST-Pattern,Zone-Status,Zone-Length,Zone-Sequence,NewHigh,RSI-Pattern,Holding\n")
+	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,EMA8>EMA88,EMA8>EMA50,EMA8-88-Diff,EMA-8-50-Diff,NewHigh,SAR-Pattern,EMA88-T1,EMA88-T2,EMA88-T3,RSI-T1,Corona-Change,Holding")
+
 	if err != nil {
 		log.Fatal(err)
 		f.Close()
@@ -79,6 +80,8 @@ func main() {
 		}
 		analysis := stock + "," + price + ","
 		values, _ := redis.StringMap(j, err)
+		/* Heiken Ashi Data */
+		analysis += values["Volume-DMA"] + ","
 		analysis += values["HA-Today"] + ","
 		analysis += values["HA-Pattern"] + ","
 		analysis += values["HAC-T"] + ","
@@ -86,12 +89,29 @@ func main() {
 		analysis += values["HAC-2D"] + ","
 		analysis += values["HAC-3D"] + ","
 		analysis += values["HA-Trend-Days"] + ","
-		analysis += values["ST-Pattern"] + ","
-		analysis += values["Zone-Status"] + ","
-		analysis += values["Zone-Length"] + ","
-		analysis += values["Zone-Sequence"] + ","
+
+		/* RSI Data */
+		analysis += values["RSI-50-Cross"] + ","
+		analysis += values["RSI"] + ","
+		analysis += values["RSI-Trend"] + ","
+
+		/* EMA8 Data */
+		analysis += values["EMA8-Pattern"] + ","
+		analysis += values["EMA8>EMA88"] + ","
+		analysis += values["EMA8>EMA50"] + ","
+		analysis += values["EMA-8-88-Diff"] + ","
+		analysis += values["EMA-8-50-Diff"] + ","
+
+		/* Long term trend data */
 		analysis += values["NewHigh"] + ","
-		analysis += values["RSI-Pattern"] + ","
+
+		/* Other information */
+		analysis += values["Sar-Pattern"] + ","
+		analysis += values["EMA88-T1"] + ","
+		analysis += values["EMA88-T2"] + ","
+		analysis += values["EMA88-T3"] + ","
+		analysis += values["RSI-T1"] + ","
+		analysis += values["Corona-Change"] + ","
 		if contains(holdings, stock) {
 			analysis += "Y,"
 		} else {
@@ -99,6 +119,12 @@ func main() {
 		}
 		analysis += "\n"
 		fmt.Println(analysis)
+		if !contains(holdings, stock) && strings.Contains(values["EMA-8-50-Diff"], "-") {
+			continue
+		}
+		if !contains(holdings, stock) && (values["RSI-Trend"] == "N") {
+			continue
+		}
 		f.WriteString(analysis)
 	}
 

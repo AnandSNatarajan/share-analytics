@@ -142,25 +142,25 @@ func heikenAshiAnalysis(conn redis.Conn, stock string, sclose []float64, ha_open
 	redis.String(conn.Do("HSET", stock, "HA-Pattern", pattern))
 }
 
-func cdrString(ema3 []float64, ema8 []float64, index int) string {
-	if ema3[index-1] > ema8[index-1] && ema3[index] < ema8[index] {
+func cdrString(ema1 []float64, ema2 []float64, index int) string {
+	if ema1[index-1] > ema2[index-1] && ema1[index] < ema2[index] {
 		return "RD"
 	}
 
-	if ema3[index-1] < ema8[index-1] && ema3[index] > ema8[index] {
+	if ema1[index-1] < ema2[index-1] && ema1[index] > ema2[index] {
 		return "RU"
 	}
 
-	if ema3[index] > ema8[index] {
-		if (ema3[index-1] - ema8[index-1]) > (ema3[index] - ema8[index]) {
+	if ema1[index] > ema2[index] {
+		if (ema1[index-1] - ema2[index-1]) > (ema1[index] - ema2[index]) {
 			return "C"
 		} else {
 			return "D"
 		}
 	}
 
-	if ema8[index] > ema3[index] {
-		if (ema8[index-1] - ema3[index-1]) > (ema8[index] - ema3[index]) {
+	if ema2[index] > ema1[index] {
+		if (ema2[index-1] - ema1[index-1]) > (ema2[index] - ema1[index]) {
 			return "C"
 		} else {
 			return "D"
@@ -176,7 +176,7 @@ func emaAnalysis(ema1 []float64, ema2 []float64) (string, int) {
 	var pattern = ""
 	var chg int
 
-	for i := 7; i >= 1; i-- {
+	for i := 2; i >= 1; i-- {
 		cc := cdrString(ema1, ema2, days-i)
 		pattern += (cc + "-")
 	}
@@ -236,124 +236,187 @@ func sarPattern(shigh []float64, slow []float64, sclose []float64) []string {
 	sar := talib.Sar(shigh, slow, 0.02, 0.2)
 	for i := 0; i <= len(shigh)-1; i++ {
 		if sar[i] > sclose[i] {
-			pattern[i] = "D"
+			pattern[i] = "Downtrend"
 		} else {
-			pattern[i] = "U"
+			pattern[i] = "Uptrend"
 		}
 	}
 
 	return pattern
 }
 
-func zoneAnalysis(ha_close []float64, shigh []float64, slow []float64, sclose []float64, sar_pattern []string) (string, string, int) {
+func rsiAnalysis(conn redis.Conn, stock string, rsi9 []float64, wrsi9 []float64, mwrsi9 []float64) {
+	rsi_str := fmt.Sprintf("%0.2f", rsi9[len(rsi9)-1])
+	conn.Do("HSET", stock+":"+"Analysis", "RSI", rsi_str)
+	wtoday := len(wrsi9) - 1
+	mwtoday := len(mwrsi9) - 1
 
-	var last_zone, penultimate_zone, zone_status, zone_sequence string
-
-	st_macd, _, _ := talib.Macd(ha_close, 3, 13, 8)
-	lt_macd, _, _ := talib.Macd(ha_close, 13, 50, 8)
-
-	today := len(st_macd) - 1
-	zone_length := 0
-	zone_changed := false
-
-	for i := 0; i <= 51; i++ {
-		if st_macd[today-i] > 0 && lt_macd[today-i] > 0 && sar_pattern[today-i] == "U" {
-			zone_sequence += "B-"
-			if i == 0 {
-				last_zone = "B"
-				zone_length = 1
-			} else if i == 1 {
-				penultimate_zone = "B"
-			}
-			/* Still no crossover has happened */
-			if i != 0 && zone_changed == false {
-				if last_zone == "S" {
-					zone_changed = true
-				} else {
-					zone_length++
-				}
-			}
-		} else {
-			zone_sequence += "S-"
-			if i == 0 {
-				last_zone = "S"
-				zone_length = 1
-			} else if i == 1 {
-				penultimate_zone = "S"
-			}
-			if i != 0 && zone_changed == false {
-				if last_zone == "B" {
-					zone_changed = true
-				} else {
-					zone_length++
-				}
+	if mwrsi9[wtoday] > wrsi9[mwtoday] {
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-Trend", "Y")
+		var i int
+		for i = 1; i <= len(wrsi9)-1; i++ {
+			if mwrsi9[wtoday-i] < wrsi9[mwtoday-i] {
+				break
 			}
 		}
-	}
-
-	if last_zone == "B" && penultimate_zone == "S" {
-		zone_status = "Positive-Crossover"
-	} else if last_zone == "S" && penultimate_zone == "B" {
-		zone_status = "Negative-Crossover"
-	} else if last_zone == "B" {
-		zone_status = "Buy-Zone"
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-T1", i)
 	} else {
-		zone_status = "Sell-Zone"
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-Trend", "N")
+		var i int
+		for i = 1; i <= len(wrsi9)-1; i++ {
+			if mwrsi9[wtoday-i] < mwrsi9[mwtoday-i] {
+				break
+			}
+		}
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-T1", i)
 	}
 
-	return zone_sequence, zone_status, zone_length
+	var i int
+	if rsi9[len(rsi9)-1] > 50 {
+		for i = 2; i < len(rsi9)-1; i++ {
+			if rsi9[len(rsi9)-i] < 50 {
+				break
+			}
+		}
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-50-Cross", i-1)
+	} else {
+		conn.Do("HSET", stock+":"+"Analysis", "RSI-50-Cross", 0)
+	}
+
 }
 
-func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, dates []string) {
+func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []float64, slow []float64, sclose []float64, volume []float64, dates []string) {
 
 	ha_high, ha_open, ha_close, ha_low := MyHeikinashiCandles(shigh, sopen, sclose, slow)
 
-	var ema13, ema3 []float64
-	if len(ha_close)-1 > 3 {
-		ema3 = talib.Ema(ha_close, 3)
+	var ema50, ema88, ema8 []float64
+	if len(sclose)-1 > 8 {
+		ema8 = talib.Ema(ha_close, 8)
 	}
-	if len(ha_close)-1 > 13 {
-		ema13 = talib.Ema(ha_close, 13)
+	if len(sclose)-1 > 50 {
+		ema50 = talib.Ema(ha_close, 50)
 	}
-
-	color := GREEN
-	if len(ha_close)-1 > 8 {
-		if ha_close[len(ha_close)-1] > ha_open[len(ha_close)-1] {
-			color = GREEN
-		} else {
-			color = RED
-		}
-
-		rsi8 := talib.Rsi(ha_close, 8)
-		today := len(rsi8) - 1
-		if (rsi8[today] > rsi8[today-1]) && (color != GREEN) {
-			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Abnormal")
-		} else if (rsi8[today] < rsi8[today-1]) && (color != RED) {
-			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Abnormal")
-		} else {
-			conn.Do("HSET", stock+":"+"Analysis", "RSI-Pattern", "Normal")
-		}
+	if len(ema8)-1 > 8 {
+		ema88 = talib.Ema(ha_close, 3)
 	}
 
-	if len(ha_close) > 8 {
-		pattern, _ := emaAnalysis(ema3, ema13)
-		conn.Do("HSET", stock+":"+"Analysis", "ST-Pattern", pattern)
+	if len(sclose)-1 > 50 {
+		vol_dma := talib.Sma(volume, 50)
+		vol_dma_str := fmt.Sprintf("%0.0f", vol_dma[len(vol_dma)-1])
+		conn.Do("HSET", stock+":"+"Analysis", "Volume-DMA", vol_dma_str)
 	}
+
+	rsi9 := talib.Rsi(sclose, 9)
+	wrsi9 := talib.Wma(rsi9, 21)
+	mwrsi9 := talib.Sma(rsi9, 3)
+
 	sar_pattern := sarPattern(shigh, slow, sclose)
-	zone_sequence, zone_status, zone_length := zoneAnalysis(ha_close, shigh, slow, sclose, sar_pattern)
 
 	positive := 0
-	for i := 1; i <= 13; i++ {
+	for i := 1; i <= len(ha_close)-2; i++ {
 		if ha_close[len(ha_close)-1] > ha_close[len(ha_close)-i-1] {
 			positive++
+		} else {
+			break
 		}
 	}
 
-	conn.Do("HSET", stock+":"+"Analysis", "Sar", sar_pattern)
-	conn.Do("HSET", stock+":"+"Analysis", "Zone-Sequence", zone_sequence)
-	conn.Do("HSET", stock+":"+"Analysis", "Zone-Status", zone_status)
-	conn.Do("HSET", stock+":"+"Analysis", "Zone-Length", zone_length)
+	corona_high := 0.0
+	for i := 120; i <= 240; i++ {
+		if sclose[len(sclose)-i] > corona_high {
+			corona_high = sclose[len(sclose)-i]
+		}
+	}
+	corona_chg := ((sclose[len(sclose)-1] - corona_high) / corona_high) * 100
+	corona_chg_str := fmt.Sprintf("%0.2f", corona_chg)
+	conn.Do("HSET", stock+":"+"Analysis", "Corona-Change", corona_chg_str)
+
+	if ema8[len(ema8)-1] > ema50[len(ema50)-1] {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA8>EMA50", "Y")
+	} else {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA8>EMA50", "N")
+	}
+
+	ema_pattern, _ := emaAnalysis(ema88, ema8)
+	conn.Do("HSET", stock+":"+"Analysis", "EMA8-Pattern", ema_pattern)
+
+	if ema8[len(ema8)-1] > ema88[len(ema88)-1] {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA8>EMA88", "Y")
+
+		trend_days := 1
+		prev_trend_days := 1
+		prev2_trend_days := 1
+		var i, j int
+		for i = 2; i < len(ema8)-2; i++ {
+			if ema8[len(ema8)-i] > ema88[len(ema88)-i] {
+				trend_days++
+			} else {
+				break
+			}
+		}
+		for j = i; j < len(ema8)-i-2; j++ {
+			if ema8[len(ema8)-j] < ema88[len(ema88)-j] {
+				prev_trend_days++
+			} else {
+				break
+			}
+		}
+		for k := j; k < len(ema8)-i-j-2; k++ {
+			if ema8[len(ema8)-k] > ema88[len(ema88)-k] {
+				prev2_trend_days++
+			} else {
+				break
+			}
+		}
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T1", trend_days)
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T2", prev_trend_days)
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T3", prev2_trend_days)
+
+	} else {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA8>EMA88", "N")
+		trend_days := 1
+		prev_trend_days := 1
+		prev2_trend_days := 1
+		var i, j int
+		for i = 2; i < len(ema8)-2; i++ {
+			if ema8[len(ema8)-i] < ema88[len(ema88)-i] {
+				trend_days++
+			} else {
+				break
+			}
+		}
+		for j = i; j < len(ema8)-i-2; j++ {
+			if ema8[len(ema8)-j] > ema88[len(ema88)-j] {
+				prev_trend_days++
+			} else {
+				break
+			}
+		}
+		for k := j; k < len(ema8)-i-j-2; k++ {
+			if ema8[len(ema8)-k] < ema88[len(ema88)-k] {
+				prev2_trend_days++
+			} else {
+				break
+			}
+		}
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T1", trend_days)
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T2", prev_trend_days)
+		conn.Do("HSET", stock+":"+"Analysis", "EMA88-T3", prev2_trend_days)
+	}
+
+	var ema_diff float64
+	var ema_diff_str string
+
+	ema_diff = ((ema8[len(ema8)-1] - ema50[len(ema50)-1]) / ema50[len(ema50)-1]) * 100
+	ema_diff_str = fmt.Sprintf("%0.2f", ema_diff)
+	conn.Do("HSET", stock+":"+"Analysis", "EMA-8-50-Diff", ema_diff_str)
+	ema_diff = ((ema88[len(ema88)-1] - ema8[len(ema8)-1]) / ema8[len(ema8)-1]) * 100
+	ema_diff_str = fmt.Sprintf("%0.2f", ema_diff)
+	conn.Do("HSET", stock+":"+"Analysis", "EMA-8-88-Diff", ema_diff_str)
+	conn.Do("HSET", stock+":"+"Analysis", "Sar-Pattern", sar_pattern[len(sar_pattern)-1])
 	conn.Do("HSET", stock+":"+"Analysis", "NewHigh", positive)
+
+	rsiAnalysis(conn, stock, rsi9, wrsi9, mwrsi9)
 
 	heikenAshiAnalysis(conn, stock+":"+"Analysis", sclose, ha_open, ha_high, ha_low, ha_close, dates)
 	//priceActionAnalysis(conn, stock+":"+"Analysis", sopen, shigh, slow, sclose)

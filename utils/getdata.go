@@ -7,10 +7,9 @@ import (
 	"strconv"
 )
 
-func PullAllStockData(stock string, dates []string) ([]float64, []float64, []float64, []float64, []int64) {
+func PullAllStockData(stock string, dates []string) ([]float64, []float64, []float64, []float64, []float64) {
 
-	var sopen, shigh, slow, sclose []float64
-	var volume []int64
+	var sopen, shigh, slow, sclose, volume []float64
 
 	conn, err := redis.Dial("tcp", "localhost:6379", redis.DialDatabase(14))
 	if err != nil {
@@ -56,12 +55,14 @@ func PullAllStockData(stock string, dates []string) ([]float64, []float64, []flo
 		price, err = redis.String(conn.Do("HGET", stock+":volume", date))
 		if err != nil {
 			log.Print("Unable to retrieve volume for ", stock, date)
+			i = 0
+		} else {
+			i, err = strconv.ParseInt(price, 10, 64)
 		}
-		i, err = strconv.ParseInt(price, 10, 64)
-		volume = append(volume, i)
+		volume = append(volume, float64(i))
 	}
 
-	StockCommentary(conn, stock, sopen, shigh, slow, sclose, dates)
+	StockCommentary(conn, stock, sopen, shigh, slow, sclose, volume, dates)
 
 	return sopen, shigh, slow, sclose, volume
 }
