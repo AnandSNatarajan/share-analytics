@@ -58,7 +58,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,EMA8>EMA88,EMA8>EMA50,EMA8-88-Diff,EMA-8-50-Diff,NewHigh,SAR-Pattern,EMA88-T1,EMA88-T2,EMA88-T3,RSI-T1,Corona-Change,Holding")
+	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,LEMA>LEMA_AVG,LEMA>HEMA,LEMA-LEMA-AVG-Diff,LEMA-HEMA-Diff,SAR-Pattern,LEMA-T1,Pullback-T1,Pullback-N,ADX-Trend,ADX-T1,ADX,RSI-T1,Corona-Change,Holding\n")
 
 	if err != nil {
 		log.Fatal(err)
@@ -97,19 +97,19 @@ func main() {
 
 		/* EMA8 Data */
 		analysis += values["EMA8-Pattern"] + ","
-		analysis += values["EMA8>EMA88"] + ","
-		analysis += values["EMA8>EMA50"] + ","
-		analysis += values["EMA-8-88-Diff"] + ","
-		analysis += values["EMA-8-50-Diff"] + ","
-
-		/* Long term trend data */
-		analysis += values["NewHigh"] + ","
+		analysis += values["LEMA>LEMA-AVG"] + ","
+		analysis += values["LEMA>HEMA"] + ","
+		analysis += values["LEMA-LEMA-AVG-Diff"] + ","
+		analysis += values["LEMA-HEMA-Diff"] + ","
 
 		/* Other information */
 		analysis += values["Sar-Pattern"] + ","
-		analysis += values["EMA88-T1"] + ","
-		analysis += values["EMA88-T2"] + ","
-		analysis += values["EMA88-T3"] + ","
+		analysis += values["LEMA-T1"] + ","
+		analysis += values["Pullback-T1"] + ","
+		analysis += values["Pullback-N"] + ","
+		analysis += values["ADX-Trend"] + ","
+		analysis += values["ADX-T1"] + ","
+		analysis += values["ADX"] + ","
 		analysis += values["RSI-T1"] + ","
 		analysis += values["Corona-Change"] + ","
 		if contains(holdings, stock) {
@@ -119,10 +119,16 @@ func main() {
 		}
 		analysis += "\n"
 		fmt.Println(analysis)
-		if !contains(holdings, stock) && strings.Contains(values["EMA-8-50-Diff"], "-") {
+		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["LEMA>HEMA"], "N") {
 			continue
 		}
-		if !contains(holdings, stock) && (values["RSI-Trend"] == "N") {
+		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["LEMA>LEMA-AVG"], "N") {
+			continue
+		}
+		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["RSI-Trend"], "N") {
+			continue
+		}
+		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["ADX-Trend"], "N") {
 			continue
 		}
 		f.WriteString(analysis)
