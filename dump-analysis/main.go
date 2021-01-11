@@ -58,7 +58,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,LEMA>LEMA_AVG,LEMA>HEMA,LEMA-LEMA-AVG-Diff,LEMA-HEMA-Diff,SAR-Pattern,LEMA-T1,Pullback-T1,Pullback-N,ADX-Trend,ADX-T1,ADX,RSI-T1,Corona-Change,Holding\n")
+	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,LEMA>LEMA_AVG,LEMA>HEMA,LEMA-LEMA-AVG-Diff,LEMA-HEMA-Diff,SAR-Pattern,LEMA-T1,Pullback-T1,Pullback-N,ADX-Trend,ADX-T1,ADX,RSI-T1,Strength,Corona-Change,Holding\n")
 
 	if err != nil {
 		log.Fatal(err)
@@ -111,6 +111,7 @@ func main() {
 		analysis += values["ADX-T1"] + ","
 		analysis += values["ADX"] + ","
 		analysis += values["RSI-T1"] + ","
+		analysis += values["Strength"] + ","
 		analysis += values["Corona-Change"] + ","
 		if contains(holdings, stock) {
 			analysis += "Y,"
@@ -119,16 +120,20 @@ func main() {
 		}
 		analysis += "\n"
 		fmt.Println(analysis)
-		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["LEMA>HEMA"], "N") {
+		skip_check := false
+		if strings.Contains(s[l-1], "Holdings") || strings.Contains(s[l-1], "FnO") {
+			skip_check = true
+		}
+		if !skip_check && strings.Contains(values["LEMA>HEMA"], "N") {
 			continue
 		}
-		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["LEMA>LEMA-AVG"], "N") {
+		if !skip_check && strings.Contains(values["LEMA>LEMA-AVG"], "N") {
 			continue
 		}
-		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["RSI-Trend"], "N") {
+		if !skip_check && strings.Contains(values["RSI-Trend"], "N") {
 			continue
 		}
-		if strings.Contains(s[l-1], "Holdings") || strings.Contains(values["ADX-Trend"], "N") {
+		if !skip_check && strings.Contains(values["ADX-Trend"], "N") {
 			continue
 		}
 		f.WriteString(analysis)

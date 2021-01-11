@@ -378,8 +378,16 @@ func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []flo
 			conn.Do("HSET", stock+":"+"Analysis", "Pullback-T1", 0)
 		}
 
+		if sema[len(sema)-1] < sema_avg[len(sema_avg)-1] {
+			conn.Do("HSET", stock+":"+"Analysis", "Strength", "Weak")
+		} else {
+			conn.Do("HSET", stock+":"+"Analysis", "Strength", "Strong")
+		}
+
 	} else {
 		conn.Do("HSET", stock+":"+"Analysis", "LEMA>LEMA-AVG", "N")
+		conn.Do("HSET", stock+":"+"Analysis", "Strength", "Not-Applicable")
+
 		trend_days := 1
 		var i int
 		for i = 2; i < len(lema)-2; i++ {
