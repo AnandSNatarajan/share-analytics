@@ -58,7 +58,8 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	_, err = f.WriteString("Stock,Price,Volume-DMA,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-50-Cross,RSI,RSI-Trend,EMA-Pattern,LEMA>LEMA_AVG,LEMA>HEMA,LEMA-LEMA-AVG-Diff,LEMA-HEMA-Diff,SAR-Pattern,LEMA-T1,Pullback-T1,Pullback-N,ADX-Trend,ADX-T1,ADX,RSI-T1,Strength,Corona-Change,Holding\n")
+	//_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-Trend,RSI,RSI-50-Cross,RSI-T1,ADX-Trend,ADX-T1,ADX,Slow-EMA-Trend,Slow-EMA-T1,Fast-EMA-Trend,Fast-EMA-T1,50-EMA-Diff,200-EMA-Diff,Holding\n")
+	_, err = f.WriteString("Stock,Price,HA-3D,HA-2D,HA-1D,HA-T,Mama-Trend,Mama-T1,Holding\n")
 
 	if err != nil {
 		log.Fatal(err)
@@ -81,38 +82,50 @@ func main() {
 		analysis := stock + "," + price + ","
 		values, _ := redis.StringMap(j, err)
 		/* Heiken Ashi Data */
-		analysis += values["Volume-DMA"] + ","
-		analysis += values["HA-Today"] + ","
-		analysis += values["HA-Pattern"] + ","
-		analysis += values["HAC-T"] + ","
-		analysis += values["HAC-1D"] + ","
-		analysis += values["HAC-2D"] + ","
+		//analysis += values["HA-Pattern"] + ","
 		analysis += values["HAC-3D"] + ","
-		analysis += values["HA-Trend-Days"] + ","
+		analysis += values["HAC-2D"] + ","
+		analysis += values["HAC-1D"] + ","
+		analysis += values["HAC-T"] + ","
+		//analysis += values["HA-Trend-Days"] + ","
+
+		analysis += values["Mama-Trend"] + ","
+		analysis += values["Mama-T1"] + ","
+
+		/* Wclose Data */
+		//analysis += values["KST-Trend"] + ","
+		//analysis += values["KST-T1"] + ","
+		//analysis += values["KST-Signal-Trend"] + ","
+		//analysis += values["KST-Signal-T1"] + ","
+
+		/* RS Data */
+		//analysis += values["RS-Trend"] + ","
+		//analysis += values["RS-T1"] + ","
 
 		/* RSI Data */
-		analysis += values["RSI-50-Cross"] + ","
-		analysis += values["RSI"] + ","
-		analysis += values["RSI-Trend"] + ","
+		//analysis += values["RSI-Trend"] + ","
+		//analysis += values["RSI"] + ","
+		//analysis += values["RSI-50-Cross"] + ","
+		//analysis += values["RSI-T1"] + ","
+
+		/* Adx Data */
+		//analysis += values["ADX-Trend"] + ","
+		//analysis += values["ADX-T1"] + ","
+		//analysis += values["ADX"] + ","
 
 		/* EMA8 Data */
-		analysis += values["EMA8-Pattern"] + ","
-		analysis += values["LEMA>LEMA-AVG"] + ","
-		analysis += values["LEMA>HEMA"] + ","
-		analysis += values["LEMA-LEMA-AVG-Diff"] + ","
-		analysis += values["LEMA-HEMA-Diff"] + ","
+		//analysis += values["Slow-EMA-Trend"] + ","
+		//analysis += values["Slow-EMA-T1"] + ","
+		//analysis += values["Fast-EMA-Trend"] + ","
+		//analysis += values["Fast-EMA-T1"] + ","
+		//analysis += values["50-EMA-Diff"] + ","
+		//analysis += values["200-EMA-Diff"] + ","
+
+		/* MACD Data */
+		//analysis += values["MACD-Trend"] + ","
+		//analysis += values["MACD-T1"] + ","
 
 		/* Other information */
-		analysis += values["Sar-Pattern"] + ","
-		analysis += values["LEMA-T1"] + ","
-		analysis += values["Pullback-T1"] + ","
-		analysis += values["Pullback-N"] + ","
-		analysis += values["ADX-Trend"] + ","
-		analysis += values["ADX-T1"] + ","
-		analysis += values["ADX"] + ","
-		analysis += values["RSI-T1"] + ","
-		analysis += values["Strength"] + ","
-		analysis += values["Corona-Change"] + ","
 		if contains(holdings, stock) {
 			analysis += "Y,"
 		} else {
@@ -120,22 +133,6 @@ func main() {
 		}
 		analysis += "\n"
 		fmt.Println(analysis)
-		skip_check := false
-		if strings.Contains(s[l-1], "Holdings") || strings.Contains(s[l-1], "FnO") {
-			skip_check = true
-		}
-		if !skip_check && strings.Contains(values["LEMA>HEMA"], "N") {
-			continue
-		}
-		if !skip_check && strings.Contains(values["LEMA>LEMA-AVG"], "N") {
-			continue
-		}
-		if !skip_check && strings.Contains(values["RSI-Trend"], "N") {
-			continue
-		}
-		if !skip_check && strings.Contains(values["ADX-Trend"], "N") {
-			continue
-		}
 		f.WriteString(analysis)
 	}
 
