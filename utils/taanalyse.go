@@ -13,42 +13,6 @@ const (
 	RED   = 2
 )
 
-// Ema - Exponential Moving Average
-func ema(inReal []float64, inTimePeriod int, k1 float64) []float64 {
-
-	outReal := make([]float64, len(inReal))
-
-	lookbackTotal := inTimePeriod - 1
-	startIdx := lookbackTotal
-	today := startIdx - lookbackTotal
-	i := inTimePeriod
-	tempReal := 0.0
-	for i > 0 {
-		tempReal += inReal[today]
-		today++
-		i--
-	}
-
-	prevMA := tempReal / float64(inTimePeriod)
-
-	for today <= startIdx {
-		//prevMA = ((inReal[today] - prevMA) * k1) + prevMA
-		prevMA = ((inReal[today]-prevMA)*k1 + prevMA*(1-k1))
-		today++
-	}
-	outReal[startIdx] = prevMA
-	outIdx := startIdx + 1
-	for today < len(inReal) {
-		prevMA = ((inReal[today]-prevMA)*k1 + prevMA*(1-k1))
-		//prevMA = ((inReal[today] - prevMA) * k1) + prevMA
-		outReal[outIdx] = prevMA
-		today++
-		outIdx++
-	}
-
-	return outReal
-}
-
 // HtTrendline - Hilbert Transform - Instantaneous Trendline (lookback=63)
 func heikenAshiPrepareCandles(ha_open []float64, ha_high []float64, ha_low []float64, ha_close []float64, color []int, ctype []string) {
 
@@ -111,6 +75,26 @@ func heikenAshiAnalysis(conn redis.Conn, stock string, sclose []float64, ha_open
 	redis.String(conn.Do("HSET", stock, "HAC-1D", ctype[today-1]))
 	redis.String(conn.Do("HSET", stock, "HAC-2D", ctype[today-2]))
 	redis.String(conn.Do("HSET", stock, "HAC-3D", ctype[today-3]))
+	redis.String(conn.Do("HSET", stock, "HAC-3D", ctype[today-3]))
+	redis.String(conn.Do("HSET", stock, "HA-Close", ha_close[today]))
+	redis.String(conn.Do("HSET", stock, "HA-Open", ha_open[today]))
+
+	var i int
+	if ha_close[today] > ha_open[today] {
+		for i = 1; i < len(ha_close); i++ {
+			if ha_close[today-i] < ha_open[today-i] {
+				break
+			}
+		}
+		redis.String(conn.Do("HSET", stock, "Color-Streak", i))
+	} else {
+		for i = 1; i < len(ha_close); i++ {
+			if ha_close[today-i] > ha_open[today-i] {
+				break
+			}
+		}
+		redis.String(conn.Do("HSET", stock, "Color-Streak", i))
+	}
 }
 
 func MyHeikinashiCandles(highs []float64, opens []float64, closes []float64, lows []float64) ([]float64, []float64, []float64, []float64) {
@@ -155,6 +139,28 @@ func sarPattern(shigh []float64, slow []float64, sclose []float64) []string {
 	return pattern
 }
 
+func emaAnalysis(conn redis.Conn, stock string, sclose []float64) {
+	ema26 := talib.Ema(sclose, 26)
+	ema100 := talib.Ema(sclose, 100)
+
+	sclose_today := sclose[len(sclose)-1]
+	ema100_today := ema100[len(ema100)-1]
+	ema26_today := ema26[len(ema26)-1]
+
+	ema100_diff := ((sclose_today - ema100_today) / sclose_today) * 100
+	ema26_diff := ((sclose_today - ema26_today) / sclose_today) * 100
+
+	ema100_diffstr := fmt.Sprintf("%0.02f", ema100_diff)
+	ema26_diffstr := fmt.Sprintf("%0.02f", ema26_diff)
+	conn.Do("HSET", stock+":"+"Analysis", "EMA100-Diff", ema100_diffstr)
+	conn.Do("HSET", stock+":"+"Analysis", "EMA26-Diff", ema26_diffstr)
+	if ema26_today > ema100_today {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA-Trend", "Uptrend")
+	} else {
+		conn.Do("HSET", stock+":"+"Analysis", "EMA-Trend", "Downtrend")
+	}
+}
+
 func rsiAnalysis(conn redis.Conn, stock string, rsi []float64, slowrsi []float64, fastrsi []float64) {
 	rsi_str := fmt.Sprintf("%0.2f", rsi[len(rsi)-1])
 	conn.Do("HSET", stock+":"+"Analysis", "RSI", rsi_str)
@@ -169,56 +175,6 @@ func rsiAnalysis(conn redis.Conn, stock string, rsi []float64, slowrsi []float64
 		conn.Do("HSET", stock+":"+"Analysis", "RSI-50-Cross", i-1)
 	} else {
 		conn.Do("HSET", stock+":"+"Analysis", "RSI-50-Cross", 0)
-	}
-}
-
-func emaTrend(ema []float64, ema_avg []float64) int {
-
-	trend_days := 1
-
-	if ema[len(ema)-1] > ema_avg[len(ema_avg)-1] {
-		for i := 2; i < len(ema)-2; i++ {
-			if ema[len(ema)-i] > ema_avg[len(ema_avg)-i] {
-				trend_days++
-			} else {
-				break
-			}
-		}
-	} else {
-		for i := 2; i < len(ema)-2; i++ {
-			if ema[len(ema)-i] < ema_avg[len(ema_avg)-i] {
-				trend_days++
-			} else {
-				break
-			}
-		}
-	}
-
-	return trend_days
-}
-
-func mamaAnalysis(conn redis.Conn, stock string, sclose []float64) {
-	mama, fama := talib.Mama(sclose, 0.5, 0.05)
-
-	today := len(mama) - 1
-	if fama[today] > mama[today] {
-		conn.Do("HSET", stock+":"+"Analysis", "Mama-Trend", "Uptrend")
-		var k int
-		for k = k; k < 99; k++ {
-			if mama[today-k] < fama[today-k] {
-				break
-			}
-		}
-		conn.Do("HSET", stock+":"+"Analysis", "Mama-T1", k)
-	} else {
-		conn.Do("HSET", stock+":"+"Analysis", "Mama-Trend", "Downtrend")
-		var k int
-		for k = 2; k < 99; k++ {
-			if mama[today-k] > fama[today-k] {
-				break
-			}
-		}
-		conn.Do("HSET", stock+":"+"Analysis", "Mama-T1", k)
 	}
 }
 
@@ -300,7 +256,7 @@ func StockCommentary(conn redis.Conn, stock string, sopen []float64, shigh []flo
 	//rsiAnalysis(conn, stock, rsi, slowrsi, fastrsi)
 	//rsAnalysis(conn, stock, sclose, idxclose)
 	//macdAnalysis(conn, stock, sclose, dates)
-	mamaAnalysis(conn, stock, sclose)
 
 	heikenAshiAnalysis(conn, stock+":"+"Analysis", sclose, ha_open, ha_high, ha_low, ha_close, dates)
+	emaAnalysis(conn, stock, sclose)
 }

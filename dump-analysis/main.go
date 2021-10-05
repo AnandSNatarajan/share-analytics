@@ -59,7 +59,7 @@ func main() {
 		return
 	}
 	//_, err = f.WriteString("Stock,Price,HA-Today,HA-Pattern,HAC-T,HAC-1D,HAC-2D,HAC-3D,HA-Trend-Days,RSI-Trend,RSI,RSI-50-Cross,RSI-T1,ADX-Trend,ADX-T1,ADX,Slow-EMA-Trend,Slow-EMA-T1,Fast-EMA-Trend,Fast-EMA-T1,50-EMA-Diff,200-EMA-Diff,Holding\n")
-	_, err = f.WriteString("Stock,Price,HA-3D,HA-2D,HA-1D,HA-T,Mama-Trend,Mama-T1,Holding\n")
+	_, err = f.WriteString("Stock,Price,HA-3D,HA-2D,HA-1D,HA-T,Color-Streak,EMA-Trend,EMA26-Diff,EMA100-Diff,HA-Open,HA-Close,Holding\n")
 
 	if err != nil {
 		log.Fatal(err)
@@ -87,39 +87,15 @@ func main() {
 		analysis += values["HAC-2D"] + ","
 		analysis += values["HAC-1D"] + ","
 		analysis += values["HAC-T"] + ","
+		analysis += values["Color-Streak"] + ","
 		//analysis += values["HA-Trend-Days"] + ","
 
-		analysis += values["Mama-Trend"] + ","
-		analysis += values["Mama-T1"] + ","
+		analysis += values["EMA-Trend"] + ","
+		analysis += values["EMA26-Diff"] + ","
+		analysis += values["EMA100-Diff"] + ","
 
-		/* Wclose Data */
-		//analysis += values["KST-Trend"] + ","
-		//analysis += values["KST-T1"] + ","
-		//analysis += values["KST-Signal-Trend"] + ","
-		//analysis += values["KST-Signal-T1"] + ","
-
-		/* RS Data */
-		//analysis += values["RS-Trend"] + ","
-		//analysis += values["RS-T1"] + ","
-
-		/* RSI Data */
-		//analysis += values["RSI-Trend"] + ","
-		//analysis += values["RSI"] + ","
-		//analysis += values["RSI-50-Cross"] + ","
-		//analysis += values["RSI-T1"] + ","
-
-		/* Adx Data */
-		//analysis += values["ADX-Trend"] + ","
-		//analysis += values["ADX-T1"] + ","
-		//analysis += values["ADX"] + ","
-
-		/* EMA8 Data */
-		//analysis += values["Slow-EMA-Trend"] + ","
-		//analysis += values["Slow-EMA-T1"] + ","
-		//analysis += values["Fast-EMA-Trend"] + ","
-		//analysis += values["Fast-EMA-T1"] + ","
-		//analysis += values["50-EMA-Diff"] + ","
-		//analysis += values["200-EMA-Diff"] + ","
+		analysis += values["HA-Open"] + ","
+		analysis += values["HA-Close"] + ","
 
 		/* MACD Data */
 		//analysis += values["MACD-Trend"] + ","
